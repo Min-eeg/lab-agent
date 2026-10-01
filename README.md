@@ -9,8 +9,6 @@
 
 一个前后端分离的实验室预约系统：常规的**实验室 / 设备 / 预约 / 审核业务**之上，接入了一个真正能"动手干活"的 **AI 助手**——它不只是问答，而是通过 Tool Calling 直接查库、和用户确认后把预约写进数据库，全过程 SSE 流式可见。
 
-> 参考 B 站课程实践开发，在此之上做了大量功能改造与工程化修复（详见[工程细节](#-工程细节与踩坑记录)）。
-
 ---
 
 ## ✨ 功能特性
@@ -129,7 +127,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-在 `backend/` 下创建 `.env`（**不要提交真实密钥**）：
+在 `backend/` 下创建 `.env`：
 
 ```env
 DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/lab_agent?charset=utf8mb4
@@ -161,7 +159,7 @@ npm install
 npm run dev
 ```
 
-访问 <http://localhost:5173>。演示账号：`admin / admin`（管理员）、`aaa / 123`（学生）——**正式部署请务必修改**。
+访问 <http://localhost:5173>。演示账号：`admin / admin`（管理员）、`aaa / 123`（学生）。
 
 ## 📁 项目结构
 
