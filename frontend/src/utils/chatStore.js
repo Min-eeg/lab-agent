@@ -1,0 +1,130 @@
+import { ref, reactive, watch } from 'vue'
+import { chatStreamApi } from '@/api/ai'
+
+/**
+ * 对话模块级 store（单例）。
+ *
+ * 为什么不放组件里: 路由切换会销毁组件, 内存消息和进行中的流式请求都会跟着丢。
+ * 状态放在模块作用域: 组件只是视图, 切走后流继续跑、字继续拼, 切回来接着看。
+ * localStorage 做兜底持久化(刷新/换账号也能恢复), 按用户名隔离。
+ */
+
+const WELCOME = {
+  role: 'assistant',
+  content:
+    '你好，我是实验室预约助手。可以问规则和开放实验室，也可以说「帮我预约明天下午的实验室」，确认后我会帮你提交。'
+}
+
+// 模块级单例状态
+const messages = ref([])
+const loading = ref(false)
+let currentUsername = null
+
+const storageKey = () => `lab_agent_chat_${currentUsername || 'guest'}`
+
+// 只存 role/content; status、steps 是临时 UI 状态; content 为空的不存(流式中途残留)
+function plainMessages() {
+  return messages.value
+    .filter(
+      (item) =>
+        (item.role === 'user' || item.role === 'assistant') &&
+        String(item.content || '').trim()
+    )
+    .map(({ role, content }) => ({ role, content }))
+}
+
+function save() {
+  if (!currentUsername) return
+  try {
+    localStorage.setItem(storageKey(), JSON.stringify(plainMessages()))
+  } catch {
+    // 存储异常不阻塞聊天
+  }
+}
+
+// 模块级 watch 永不销毁: 流式期间每个 token 都会触发保存, 消息量小, 简单可靠
+watch(messages, save, { deep: true })
+
+// 进入页面时调用: 同一用户直接复用内存状态(切页面回来流式还在继续), 换用户才读缓存
+function initChat(username) {
+  if (currentUsername === username && messages.value.length) return
+  currentUsername = username || null
+  try {
+    const raw = localStorage.getItem(storageKey())
+    const list = raw ? JSON.parse(raw) : null
+    messages.value =
+      Array.isArray(list) && list.length
+        ? list.filter((item) => String(item.content || '').trim())
+        : []
+  } catch {
+    messages.value = []
+  }
+  if (!messages.value.length) messages.value = [{ ...WELCOME }]
+}
+
+// 发送一条消息并消费 SSE 流。onEvent 供组件做提示等视图反应, 不参与状态管理
+async function sendMessage(text, { onEvent } = {}) {
+  const content = String(text || '').trim()
+  if (!content || loading.value) return
+
+  messages.value.push({ role: 'user', content })
+  // 必须用 reactive: 普通对象 push 后再改字段, 视图可能不更新
+  const assistant = reactive({
+    role: 'assistant',
+    content: '',
+    status: '正在思考…',
+    steps: []
+  })
+  messages.value.push(assistant)
+  loading.value = true
+
+  try {
+    // 历史只传纯文本(role/content), 空 assistant 已被过滤
+    const history = plainMessages()
+    await chatStreamApi({ messages: history }, (evt) => {
+      if (evt.type === 'status') {
+        assistant.status = evt.message || '正在思考…'
+      } else if (evt.type === 'tool_start') {
+        const label = evt.label || evt.name || '工具'
+        assistant.status = `正在${label}…`
+        assistant.steps.push(`开始：${label}`)
+      } else if (evt.type === 'tool_end') {
+        const label = evt.label || evt.name || '工具'
+        assistant.status = `${label}完成`
+        assistant.steps.push(`完成：${label}`)
+      } else if (evt.type === 'token') {
+        assistant.content += evt.content || '' // 打字机：追加，不是覆盖
+        assistant.status = '' // 开始出字后清掉「正在…」
+      } else if (evt.type === 'done') {
+        assistant.status = ''
+      } else if (evt.type === 'error') {
+        assistant.status = ''
+        if (!assistant.content) {
+          assistant.content = evt.message || '请求失败'
+        }
+      }
+      onEvent?.(evt)
+    })
+  } catch (err) {
+    assistant.status = ''
+    if (!assistant.content) {
+      assistant.content = err.message || '网络异常'
+    }
+    onEvent?.({ type: 'error', message: err.message || '网络异常' })
+  } finally {
+    loading.value = false
+    assistant.status = ''
+    save() // 兜底: 确保流结束后的完整内容已落盘
+  }
+}
+
+function clearChat() {
+  messages.value = [{ ...WELCOME }]
+  try {
+    localStorage.removeItem(storageKey())
+  } catch {}
+}
+
+export function useChatStore() {
+  return { messages, loading, initChat, sendMessage, clearChat }
+}

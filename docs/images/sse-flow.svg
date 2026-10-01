@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="588" viewBox="0 0 1080 588">
+<rect width="100%" height="100%" fill="#ffffff"/><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#607080"/></marker></defs>
+<rect x="28.0" y="30" width="128" height="44" rx="8" fill="#d9ecff" stroke="#2b7fd4" stroke-width="1.2"/>
+<text x="92.0" y="56.9" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="14" fill="#1f2d3d" text-anchor="middle" font-weight="normal">前端 fetch 流解析</text>
+<rect x="476.0" y="30" width="128" height="44" rx="8" fill="#d9ecff" stroke="#2b7fd4" stroke-width="1.2"/>
+<text x="540.0" y="56.9" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="14" fill="#1f2d3d" text-anchor="middle" font-weight="normal">FastAPI StreamingResponse</text>
+<rect x="924.0" y="30" width="128" height="44" rx="8" fill="#d9ecff" stroke="#2b7fd4" stroke-width="1.2"/>
+<text x="988.0" y="56.9" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="14" fill="#1f2d3d" text-anchor="middle" font-weight="normal">LangGraph</text>
+<line x1="92.0" y1="74" x2="92.0" y2="544" stroke="#c3ccd6" stroke-width="1.2" stroke-dasharray="4,4"/>
+<line x1="540.0" y1="74" x2="540.0" y2="544" stroke="#c3ccd6" stroke-width="1.2" stroke-dasharray="4,4"/>
+<line x1="988.0" y1="74" x2="988.0" y2="544" stroke="#c3ccd6" stroke-width="1.2" stroke-dasharray="4,4"/>
+<line x1="92.0" y1="107.0" x2="540.0" y2="107.0" stroke="#607080" stroke-width="1.4" marker-end="url(#ar)"/>
+<text x="316.0" y="99.0" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#1f2d3d" text-anchor="middle" font-weight="normal">POST /api/ai/chat/stream</text>
+<line x1="540.0" y1="157.0" x2="988.0" y2="157.0" stroke="#607080" stroke-width="1.4" marker-end="url(#ar)"/>
+<text x="764.0" y="149.0" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#1f2d3d" text-anchor="middle" font-weight="normal">agent.stream(stream_mode=[messages, updates])</text>
+<line x1="988.0" y1="207.0" x2="540.0" y2="207.0" stroke="#607080" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#ar)"/>
+<text x="764.0" y="199.0" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#1f2d3d" text-anchor="middle" font-weight="normal">工具节点更新（updates 通道）</text>
+<line x1="540.0" y1="257.0" x2="92.0" y2="257.0" stroke="#607080" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#ar)"/>
+<text x="316.0" y="249.0" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#1f2d3d" text-anchor="middle" font-weight="normal">data: {type: tool_start/tool_end} → 显示「正在查询开放实验室…」</text>
+<line x1="988.0" y1="307.0" x2="540.0" y2="307.0" stroke="#607080" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#ar)"/>
+<text x="764.0" y="299.0" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#1f2d3d" text-anchor="middle" font-weight="normal">token 增量（messages 通道 AIMessageChunk）</text>
+<line x1="540.0" y1="357.0" x2="92.0" y2="357.0" stroke="#607080" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#ar)"/>
+<text x="316.0" y="349.0" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#1f2d3d" text-anchor="middle" font-weight="normal">data: {type: token} → 气泡逐字追加</text>
+<line x1="988.0" y1="407.0" x2="540.0" y2="407.0" stroke="#607080" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#ar)"/>
+<text x="764.0" y="399.0" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#1f2d3d" text-anchor="middle" font-weight="normal">图执行结束</text>
+<line x1="540.0" y1="457.0" x2="92.0" y2="457.0" stroke="#607080" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#ar)"/>
+<text x="316.0" y="449.0" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#1f2d3d" text-anchor="middle" font-weight="normal">data: {type: done}</text>
+<rect x="28.0" y="544" width="128" height="44" rx="8" fill="#d9ecff" stroke="#2b7fd4" stroke-width="1.2"/>
+<text x="92.0" y="570.9" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="14" fill="#1f2d3d" text-anchor="middle" font-weight="normal">前端 fetch 流解析</text>
+<rect x="476.0" y="544" width="128" height="44" rx="8" fill="#d9ecff" stroke="#2b7fd4" stroke-width="1.2"/>
+<text x="540.0" y="570.9" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="14" fill="#1f2d3d" text-anchor="middle" font-weight="normal">FastAPI StreamingResponse</text>
+<rect x="924.0" y="544" width="128" height="44" rx="8" fill="#d9ecff" stroke="#2b7fd4" stroke-width="1.2"/>
+<text x="988.0" y="570.9" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="14" fill="#1f2d3d" text-anchor="middle" font-weight="normal">LangGraph</text>
+<rect x="82.0" y="604" width="916.0" height="34" rx="6" fill="#fdf6e3" stroke="#e8d49a" stroke-width="1.2"/>
+<text x="540.0" y="626" font-family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="13" fill="#7a5b12" text-anchor="middle" font-weight="normal">前端事件结构统一为 status / tool_start / tool_end / token / done / error，组件外的模块级 store 承接流，切页面不断流</text>
+</svg>
