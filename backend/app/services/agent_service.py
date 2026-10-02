@@ -4,6 +4,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, AIMe
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 from collections.abc import Iterator
+from datetime import datetime
 from typing import Any
 from app.common.exceptions import BusinessException
 from app.models.user import User
@@ -12,12 +13,18 @@ from app.services import agent_tools
 from app.config import settings
 import traceback
 
-SYSTEM_PROMPT = """你是智能实验室预约系统的 Agent，回答要简洁。
+SYSTEM_PROMPT_TEMPLATE = """你是智能实验室预约系统的 Agent，回答要简洁。
 你可以：
 1. 使用 search_lab_docs 查询实验室的规则、安全、开放时间等问题
 2. 使用 list_open_labs / list_lab_equipments  查询真实的实验室和设备
 3. 再用户进行了预约确认后，使用 create_lab_reservation 来进行真实的预约落库
 4. 使用 get_today 来进行日期的换算
+
+## 当前时间
+今天是 {today}（{weekday}），当前时间约 {now}。
+**所有日期换算都以这个日期为准**，不要凭记忆猜测今天的日期。
+"明天" = {today} 的后一天，"后天" = {today} 的后两天，以此类推。
+如果仍然需要确认日期，可以调用 get_today 复核。
 
 ## 必须遵守
 当用户提到了 今天、明天、后天 等日期相关的问题，请先调用 get_today 来获取日期，**不要直接返回 我需要确定明天的具体日期**。
@@ -27,6 +34,10 @@ SYSTEM_PROMPT = """你是智能实验室预约系统的 Agent，回答要简洁�
 工作流的确认环节里如果缺少了 lab_id，请先 list_open_labs 查到了 lab_id 再创建，不要瞎写。
 工作流的确认环节里如果缺少了 equipment_id，请先 list_lab_equipments 查到了 equipment_id 再创建，不要瞎写。
 
+**用户回复【确认】后要立刻调用 create_lab_reservation**：直接复用你上一条消息里复述给用户的
+实验室ID、日期、开始时间、结束时间，不要重新推算日期、不要重新查询、再向用户确认一次。
+这是最容易出错的一步：一旦重新推算日期，模型常会算错成过去的日期，导致预约被判为过期而失败。
+
 预约成功后状态是待审核，必须管理员确认后实验室（或设备）才能使用。
 调用 create_lab_reservation 后，必须以工具返回的 JSON 为准：
 - ok 为 true 才可以说预约成功，并把返回的 reservation_id（预约单号）告诉用户
@@ -35,6 +46,23 @@ SYSTEM_PROMPT = """你是智能实验室预约系统的 Agent，回答要简洁�
 不要瞎编数据库里没有的实验室或者设备信息。
 如果是问开放时间或者实验室规则，优先调用 search_lab_docs，不要凭空回复。
 """
+
+_WEEKDAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+
+
+def build_system_prompt() -> str:
+    """把服务器真实日期注入提示词。
+
+    实测教训: 不注入时模型在"确认"这一轮会凭记忆编造今天的日期
+    (它以为是 2026-09-21), 把 10-03 的预约判成过期, 预约直接失败。
+    """
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    return SYSTEM_PROMPT_TEMPLATE.format(
+        today=today,
+        weekday=_WEEKDAYS[now.weekday()],
+        now=now.strftime("%H:%M"),
+    )
 
 # 工具英文名 → 页面上给人看的中文过程文案
 TOOL_LABELS = {
@@ -99,7 +127,7 @@ def stream_agent(db: Session, current_user: User, data: ChatRequest) -> Iterator
         history = _build_history(data)
         agent = build_agent(db, current_user)
         # *history：把列表拆开，和 SystemMessage 拼成完整 messages
-        inputs = {"messages": [SystemMessage(content=SYSTEM_PROMPT), *history]}
+        inputs = {"messages": [SystemMessage(content=build_system_prompt()), *history]}
 
         # yield = 先交出这一条，函数暂停；前端收到后再继续往下跑
         yield {"type": "status", "message": "正在思考…"}
@@ -201,7 +229,7 @@ def run_agent(db: Session, current_user: User, data: ChatRequest):
     agent = build_agent(db, current_user)
     try:
         result = agent.invoke(
-            {"messages": [SystemMessage(content=SYSTEM_PROMPT), *history]},
+            {"messages": [SystemMessage(content=build_system_prompt()), *history]},
             config={"recursion_limit": 10},
         )  # 设置对话循环的上限是10轮
     except BusinessException:
