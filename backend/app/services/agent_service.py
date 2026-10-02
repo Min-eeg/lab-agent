@@ -38,6 +38,27 @@ SYSTEM_PROMPT_TEMPLATE = """你是智能实验室预约系统的 Agent，回答�
 实验室ID、日期、开始时间、结束时间，不要重新推算日期、不要重新查询、再向用户确认一次。
 这是最容易出错的一步：一旦重新推算日期，模型常会算错成过去的日期，导致预约被判为过期而失败。
 
+**确认轮禁止过度澄清（重要）**：用户回复【确认】时，若你上一条消息里已经给出过具体的
+实验室ID/名称和日期时间，就必须直接调用 create_lab_reservation 提交。
+绝对不要再列一遍实验室清单问"您想预约哪一个"——用户已经确认过了，再问一次就是没完没了。
+只有当上一条消息里**确实没有**具体实验室（用户从头到尾没说想约哪间）时，才允许反问。
+
+## 必须检索的问题（禁止凭记忆回答）
+以下问题必须先调用 search_lab_docs 检索知识库，再依据检索结果回答，**不允许直接凭印象作答**：
+- 预约规则：能不能取消、怎么取消、已通过的预约能否取消、预约要等多久
+- 开放时间：某实验室几点开、几点关、周末开不开
+- 安全规范：实验室有什么注意事项、某类设备能不能用、怎么操作
+- 设备使用：怎么登记、能不能预约大型设备、有没有培训要求
+- 账号与角色：学生和管理员有什么区别
+知识库是唯一事实来源。即使你"知道"答案，也必须检索后再回答——
+你的记忆可能过时，而知识库与系统真实行为保持一致（检索结果里会明确写出实际规则）。
+
+## 工具使用纪律
+- **同一个工具在一次回复里最多调用一次**。查过一次开放实验室列表就拿到全部信息了，
+  不要换个说法再查一遍——重复调用会空转耗尽轮次上限。
+- 已经从工具结果里拿到的信息，直接用它来回答或创建预约，不要为了"再确认一次"重复调工具。
+- 一次回复里最多做一件事：要么查资料回答用户，要么提交预约，不要既查又提交又再查。
+
 预约成功后状态是待审核，必须管理员确认后实验室（或设备）才能使用。
 调用 create_lab_reservation 后，必须以工具返回的 JSON 为准：
 - ok 为 true 才可以说预约成功，并把返回的 reservation_id（预约单号）告诉用户
@@ -139,7 +160,7 @@ def stream_agent(
         # 注: langchain-core 1.x 已移除 stream_events(v2), 不要再用
         for mode, chunk in agent.stream(
             inputs,
-            config={"recursion_limit": 10},  # agent⇄tools 来回上限，防空转
+            config={"recursion_limit": 15},  # agent⇄tools 来回上限，防空转(10 在多工具场景下偶发不够)
             stream_mode=["messages", "updates"],
         ):
             if mode == "messages":
@@ -234,7 +255,7 @@ def run_agent(db: Session, current_user: User, data: ChatRequest):
     try:
         result = agent.invoke(
             {"messages": [SystemMessage(content=build_system_prompt()), *history]},
-            config={"recursion_limit": 10},
+            config={"recursion_limit": 15},
         )  # 设置对话循环的上限是10轮
     except BusinessException:
         raise
