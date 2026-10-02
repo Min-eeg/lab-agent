@@ -9,7 +9,7 @@ from app.models.user import User
 from app.services import equipment_service, kb_service, lab_service, reservation_service
 
 
-def build_tools(db: Session, current_user: User):
+def build_tools(db: Session, current_user: User, dry_run: bool = False):
 
     @tool
     def search_lab_docs(query: str) -> str:
@@ -87,9 +87,13 @@ def build_tools(db: Session, current_user: User):
                 end_time=end_time,
                 remark=remark,
             )
-            reservation_id = reservation_service.create_reservation(
-                db, current_user, data
-            )
+            if dry_run:
+                # 评测模式: 走完所有校验但不落库, 避免批量回归污染业务数据
+                reservation_id = -1
+            else:
+                reservation_id = reservation_service.create_reservation(
+                    db, current_user, data
+                )
             return json.dumps(
                 {
                     "ok": True,
@@ -100,6 +104,7 @@ def build_tools(db: Session, current_user: User):
                     "date": date,
                     "start_time": start_time,
                     "end_time": end_time,
+                    "dry_run": dry_run,
                 },
                 ensure_ascii=False,
             )

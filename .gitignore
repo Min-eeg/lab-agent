@@ -25,3 +25,6 @@ backend/uploads/
 .workbuddy/
 *.log
 .DS_Store
+
+# 评测报告（每次跑会变，不入库）
+backend/eval_report.json

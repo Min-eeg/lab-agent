@@ -118,14 +118,17 @@ def _build_history(data: ChatRequest) -> list:
     return history
 
 
-def stream_agent(db: Session, current_user: User, data: ChatRequest) -> Iterator[dict]:
+def stream_agent(
+    db: Session, current_user: User, data: ChatRequest, dry_run: bool = False
+) -> Iterator[dict]:
     """生成器：边跑 Agent 边 yield 事件，供 SSE 推给前端。
 
     事件类型：status / tool_start / tool_end / token / done / error
+    dry_run=True 时预约工具只校验不落库（评测集批量回归用）
     """
     try:
         history = _build_history(data)
-        agent = build_agent(db, current_user)
+        agent = build_agent(db, current_user, dry_run=dry_run)
         # *history：把列表拆开，和 SystemMessage 拼成完整 messages
         inputs = {"messages": [SystemMessage(content=build_system_prompt()), *history]}
 
@@ -181,8 +184,9 @@ def stream_agent(db: Session, current_user: User, data: ChatRequest) -> Iterator
         yield {"type": "error", "message": "大模型调用失败，请稍后重试"}
 
 
-def build_agent(db: Session, current_user: User):
-    tools = agent_tools.build_tools(db, current_user)
+def build_agent(db: Session, current_user: User, dry_run: bool = False):
+    # dry_run: 评测模式, create_lab_reservation 只校验不落库
+    tools = agent_tools.build_tools(db, current_user, dry_run=dry_run)
     llm = ChatOpenAI(
         api_key=settings.LLM_API_KEY,
         base_url=settings.LLM_BASE_URL,

@@ -200,12 +200,48 @@ lab-agent
 4. **流式 API 迁移**：`langchain-core 1.x` 移除了 `stream_events(version="v2")`，迁移到 LangGraph 原生 `stream_mode=["messages","updates"]` 双通道方案；同时踩过 `llm.stream()` 返回生成器被塞进图状态的坑（节点内应使用 `invoke`）。
 5. **流式状态与组件生命周期**：对话状态住在组件实例里，切页面即销毁、回复只剩半截。修复：重构为模块级 store 承接流式任务，组件只是视图——切走后流继续跑，切回来还能看到打字机继续输出。
 
+## 🧪 质量保障
+
+### Agent 评测集（14 条固定用例批量回归）
+
+agent 的输出天生不确定，改一句提示词就可能整体漂移。有了固定用例 + 量化指标，才能回答"这次改动让 agent 变好了还是变坏了"。
+
+```bash
+cd backend
+.venv\Scripts\python -m scripts.run_eval                   # 跑全部用例
+.venv\Scripts\python -m scripts.run_eval -k 预约           # 只跑名字含"预约"的
+.venv\Scripts\python -m scripts.run_eval --verbose         # 打印每条用例的完整对话过程
+.venv\Scripts\python -m scripts.run_eval --save out.json  # 保存明细，便于两次运行 diff
+```
+
+- 用例分五类：工具调用 / 业务约束 / RAG / 回归 / 安全，共 14 条
+- 四个评分维度：`must_call`（必须调过的工具）、`forbidden_call`（禁止调的工具）、`must_contain`（回答必含信息）、`forbid_contain`（禁止出现的说法）
+- 输出**总通过率 + 分类得分条形图**，任一用例失败时进程返回码非 0（可直接接 CI）
+- **dry-run 模式**：`create_lab_reservation` 只走完校验不落库，评测不会污染业务数据
+- 内置 429 限流退避重试——免费额度接口跑批量回归必然被限流，不处理的话后半程用例会全军覆没
+
+典型用法：改完提示词跑一次，把 `out.json` 和上次的对比，看通过率和失败用例的变化。
+
+### 单元测试与 CI
+
+```bash
+cd backend
+python -m pytest tests -v        # 36 个用例，秒级完成，不调大模型
+```
+
+覆盖两块，都是**不依赖大模型**的确定性测试：
+
+- `test_reservation_service.py`：日期/时间规范化（含 `9:00` vs `11:00` 字符串比较坑）、过去日期、结束早于开始、实验室关闭/不存在、开放时间边界、时段冲突、`status=0` 不能用真值判断
+- `test_agent_tools.py`：工具返回值的 JSON 契约、失败必须 `ok:false` + `error`（防谎报成功）、dry-run 绝不落库、系统提示词必须注入真实日期且防幻觉护栏未被删除
+
+GitHub Actions（`.github/workflows/ci.yml`）：push / PR 自动跑后端测试 + 前端构建校验（构建失败等价于存在缺失导入，等于免费的静态检查）。
+
 ## 🗺 Roadmap
 
-- [ ] Agent 评测集（固定用例批量回归，量化回答质量）
+- [x] Agent 评测集（14 条用例 + 四维评分 + 分类得分）
+- [x] 核心业务与工具单元测试（36 个用例）+ GitHub Actions CI
 - [ ] 接入 LangSmith 做工具调用链路追踪
 - [ ] 对话记录后端持久化（跨设备同步）
-- [ ] 核心业务与工具的单元测试 / CI
 
 ## 📄 License
 
