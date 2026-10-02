@@ -8,7 +8,7 @@
         </div>
       </template>
 
-      <div ref="listRef" class="chat-list">
+      <div ref="listRef" class="chat-list" @scroll="onScroll">
         <div
           v-for="(item, index) in messages"
           :key="index"
@@ -33,7 +33,7 @@
 
       <div style="margin-top: 12px; display: flex; gap: 8px; align-items: flex-end">
         <el-input
-          v-model="input"
+          v-model="draft"
           type="textarea"
           :rows="2"
           placeholder="问问实验室怎么预约、开放时间..."
@@ -58,30 +58,50 @@ const { userInfo } = useUser()
 
 // 对话状态与流式任务都住在模块级 store 里:
 // 路由切换销毁组件也不丢消息、不中断流, 切回来接着看(和 DeepSeek 一致)
-const { messages, loading, initChat, sendMessage, clearChat } = useChatStore()
+const { messages, loading, draft, initChat, sendMessage, clearChat } = useChatStore()
 
-const input = ref('')
 const listRef = ref()
 
-const scrollToBottom = () => {
+// 贴底跟随: 只有用户本来就在底部才自动滚动;
+// 往上翻看历史时保持不动, 避免被强行拽回底部(DeepSeek 的行为)
+const stickToBottom = ref(true)
+
+const onScroll = () => {
+  const elem = listRef.value
+  if (!elem) return
+  // 距底部 80px 以内视为"贴着底部"
+  stickToBottom.value = elem.scrollHeight - elem.scrollTop - elem.clientHeight < 80
+}
+
+// force=true 用于"进入页面/刚发出消息"这类无条件滚到底的场景
+const scrollToBottom = (force = false) => {
   nextTick(() => {
     const elem = listRef.value
-    if (elem) elem.scrollTop = elem.scrollHeight
+    if (!elem) return
+    if (!force && !stickToBottom.value) return
+    elem.scrollTop = elem.scrollHeight
+    // markdown 渲染后高度还会变一帧, 再兜一次
+    requestAnimationFrame(() => {
+      elem.scrollTop = elem.scrollHeight
+    })
   })
 }
 
 onMounted(() => {
   initChat(userInfo.value?.username)
-  scrollToBottom()
+  scrollToBottom(true)
 })
 
-// 组件存活期间: 消息有变化(含流式 token)就滚到底; 组件销毁后 watch 自动停
-watch(messages, scrollToBottom)
+// deep 必须开: 发消息是 push、流式是不断追加 token,
+ // 不加 deep 时 watch 只在整体替换数组时才触发, 长对话就滚不动了
+watch(messages, () => scrollToBottom(), { deep: true })
 
 const handleSend = async () => {
-  const text = input.value.trim()
+  const text = draft.value.trim()
   if (!text || loading.value) return
-  input.value = ''
+  draft.value = ''
+  // 自己发了消息, 一定滚到底看自己的问题和后续回复
+  stickToBottom.value = true
   await sendMessage(text, {
     onEvent: (evt) => {
       // 状态变更都在 store 里完成, 组件只负责提示类视图反应

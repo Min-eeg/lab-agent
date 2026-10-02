@@ -18,9 +18,12 @@ const WELCOME = {
 // 模块级单例状态
 const messages = ref([])
 const loading = ref(false)
+// 输入框草稿也放这里: 切页面组件销毁后草稿还在(和消息同一套持久化)
+const draft = ref('')
 let currentUsername = null
 
 const storageKey = () => `lab_agent_chat_${currentUsername || 'guest'}`
+const draftKey = () => `lab_agent_chat_draft_${currentUsername || 'guest'}`
 
 // 只存 role/content; status、steps 是临时 UI 状态; content 为空的不存(流式中途残留)
 function plainMessages() {
@@ -45,6 +48,25 @@ function save() {
 // 模块级 watch 永不销毁: 流式期间每个 token 都会触发保存, 消息量小, 简单可靠
 watch(messages, save, { deep: true })
 
+// 草稿单独落盘: 切页面/刷新后回到输入框, 之前打到一半的话还在
+watch(draft, (val) => {
+  if (!currentUsername) return
+  try {
+    if (val) localStorage.setItem(draftKey(), val)
+    else localStorage.removeItem(draftKey())
+  } catch {
+    // 存储异常不阻塞输入
+  }
+})
+
+function loadDraft() {
+  try {
+    draft.value = localStorage.getItem(draftKey()) || ''
+  } catch {
+    draft.value = ''
+  }
+}
+
 // 进入页面时调用: 同一用户直接复用内存状态(切页面回来流式还在继续), 换用户才读缓存
 function initChat(username) {
   if (currentUsername === username && messages.value.length) return
@@ -60,6 +82,7 @@ function initChat(username) {
     messages.value = []
   }
   if (!messages.value.length) messages.value = [{ ...WELCOME }]
+  loadDraft()
 }
 
 // 发送一条消息并消费 SSE 流。onEvent 供组件做提示等视图反应, 不参与状态管理
@@ -120,11 +143,12 @@ async function sendMessage(text, { onEvent } = {}) {
 
 function clearChat() {
   messages.value = [{ ...WELCOME }]
+  draft.value = ''
   try {
     localStorage.removeItem(storageKey())
   } catch {}
 }
 
 export function useChatStore() {
-  return { messages, loading, initChat, sendMessage, clearChat }
+  return { messages, loading, draft, initChat, sendMessage, clearChat }
 }
