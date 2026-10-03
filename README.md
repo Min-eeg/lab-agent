@@ -130,6 +130,7 @@ pip install -r requirements.txt
 在 `backend/` 下创建 `.env`：
 
 ```env
+# ===== 必填=====
 DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/lab_agent?charset=utf8mb4
 JWT_SECRET_KEY=换成一串随机字符串
 JWT_EXPIRE_HOURS=24
@@ -137,6 +138,13 @@ JWT_ALGORITHM=HS256
 LLM_API_KEY=你的大模型APIKey
 LLM_BASE_URL=https://api.example.com/v1
 LLM_MODEL=模型名
+
+# ===== 可选：LangSmith 链路追踪 =====
+# 留空则追踪关闭，不填也能正常跑。填上并重启后，每次 agent 调用的
+# 完整链路（模型调用 / 工具调用 / 耗时）都会上传到平台便于排查
+# key 获取：https://smith.langchain.com → Settings → API Keys
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT=lab-agent
 ```
 
 下载 embedding 模型到本地（约 95MB，默认走 ModelScope 镜像，国内网络友好）：
@@ -236,20 +244,14 @@ python -m pytest tests -v        # 47 个用例，秒级完成，不调大模型
 
 ## 🔍 可观测性：LangSmith 链路追踪
 
-agent 的执行过程是黑盒——工具调了几次、每次参数是什么、哪一步耗时、token 花了多少，本地只能靠打印看。接入 LangSmith 后，每次对话的完整调用链（agent 节点 ↔ tools 节点 → 每次 LLM 调用）都会自动上传到平台可视化。
+agent 的执行过程是黑盒——工具调了几次、每次参数是什么、哪一步耗时、token 花了多少，本地只能靠打印看。接入 LangSmith 后，每次对话的完整调用链都会自动上传到平台可视化（`.env` 中的 `LANGSMITH_API_KEY` 填上即生效，代码零改动）。
 
-```env
-# backend/.env
-LANGSMITH_API_KEY=ls__你的key      # https://smith.langchain.com → Settings → API Keys
-LANGSMITH_PROJECT=lab-agent
-```
-
-填上并重启后端即可生效，**代码零改动**。不填则追踪保持关闭，完全不影响功能。
+它实际帮我们抓到过两个问题：RAG 检索意外耗时 11 秒（占了单次对话的 65%），以及模型漏调工具、重复调工具的行为轨迹。
 
 实现要点：
 - 通过环境变量启用（`setup_langsmith_tracing()`），LangChain / LangGraph 的所有子对象自动继承，无需逐节点传 callback
 - 每次调用携带 `metadata`（`user_id` / `username`）与 `run_name`，可在平台上按用户、按场景检索链路
-- 单元测试锁定"未配key 时不得污染环境变量"这一行为
+- 单元测试锁定"未配 key 时不得污染环境变量"这一行为
 
 ## 🗺 Roadmap
 
