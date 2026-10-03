@@ -160,7 +160,16 @@ def stream_agent(
         # 注: langchain-core 1.x 已移除 stream_events(v2), 不要再用
         for mode, chunk in agent.stream(
             inputs,
-            config={"recursion_limit": 15},  # agent⇄tools 来回上限，防空转(10 在多工具场景下偶发不够)
+            config={
+                "recursion_limit": 15,  # agent⇄tools 来回上限，防空转(10 在多工具场景下偶发不够)
+                # LangSmith 链路标签：在平台上按这些字段筛选/检索某次对话
+                "metadata": {
+                    "user_id": current_user.id,
+                    "username": current_user.username,
+                    "mode": "stream",
+                },
+                "run_name": "agent_booking_stream",
+            },
             stream_mode=["messages", "updates"],
         ):
             if mode == "messages":
@@ -255,7 +264,12 @@ def run_agent(db: Session, current_user: User, data: ChatRequest):
     try:
         result = agent.invoke(
             {"messages": [SystemMessage(content=build_system_prompt()), *history]},
-            config={"recursion_limit": 15},
+            config={
+                "recursion_limit": 15,
+                # LangSmith 链路标签：在平台上按这些字段筛选/检索某次对话
+                "metadata": {"user_id": current_user.id, "username": current_user.username},
+                "run_name": "agent_booking",
+            },
         )  # 设置对话循环的上限是10轮
     except BusinessException:
         raise

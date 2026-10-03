@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent# 后端根目录
 
@@ -12,6 +13,9 @@ DEFAULTS = {
     "LLM_API_KEY": "dev-only-placeholder",
     "LLM_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "LLM_MODEL": "qwen-plus",
+    # LangSmith 未配置 key 时保持空，追踪自动关闭（不填也能正常跑）
+    "LANGSMITH_API_KEY": "",
+    "LANGSMITH_PROJECT": "lab-agent",
 }
 
 
@@ -26,9 +30,37 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = DEFAULTS["LLM_BASE_URL"]
     LLM_MODEL: str = DEFAULTS["LLM_MODEL"]
 
+    # LangSmith 链路追踪（可选）：填了 API key 自动开启，没填完全不影响
+    LANGSMITH_API_KEY: str = DEFAULTS["LANGSMITH_API_KEY"]
+    LANGSMITH_PROJECT: str = DEFAULTS["LANGSMITH_PROJECT"]
+    LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com"
+
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env", env_file_encoding="utf-8")
 
+
 settings = Settings()
+
+
+def setup_langsmith_tracing() -> bool:
+    """把追踪配置写进环境变量，LangChain 会自动读取。
+
+    为什么用环境变量而不是传 callback:
+    LangChain / LangGraph 的所有子对象（ChatOpenAI、ToolNode、整张图）
+    都会自动继承，无需在每个节点手工传参 —— 一行配置全局生效。
+
+    没配 API key 时返回 False，追踪保持关闭，完全不影响正常业务。
+    """
+    if not settings.LANGSMITH_API_KEY:
+        return False
+    os.environ["LANGSMITH_API_KEY"] = settings.LANGSMITH_API_KEY
+    os.environ["LANGSMITH_PROJECT"] = settings.LANGSMITH_PROJECT
+    os.environ["LANGSMITH_ENDPOINT"] = settings.LANGSMITH_ENDPOINT
+    # 兼容老版本环境变量名，避免不同版本行为不一致
+    os.environ["LANGCHAIN_API_KEY"] = settings.LANGSMITH_API_KEY
+    os.environ["LANGCHAIN_PROJECT"] = settings.LANGSMITH_PROJECT
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGSMITH_TRACING"] = "true"
+    return True
 
 
 UPLOAD_DIR = BASE_DIR / "uploads"

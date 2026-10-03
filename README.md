@@ -226,7 +226,7 @@ cd backend
 
 ```bash
 cd backend
-python -m pytest tests -v        # 36 个用例，秒级完成，不调大模型
+python -m pytest tests -v        # 41 个用例，秒级完成，不调大模型
 ```
 
 覆盖两块，都是**不依赖大模型**的确定性测试：
@@ -234,11 +234,28 @@ python -m pytest tests -v        # 36 个用例，秒级完成，不调大模型
 - `test_reservation_service.py`：日期/时间规范化（含 `9:00` vs `11:00` 字符串比较坑）、过去日期、结束早于开始、实验室关闭/不存在、开放时间边界、时段冲突、`status=0` 不能用真值判断
 - `test_agent_tools.py`：工具返回值的 JSON 契约、失败必须 `ok:false` + `error`（防谎报成功）、dry-run 绝不落库、系统提示词必须注入真实日期且防幻觉护栏未被删除
 
+## 🔍 可观测性：LangSmith 链路追踪
+
+agent 的执行过程是黑盒——工具调了几次、每次参数是什么、哪一步耗时、token 花了多少，本地只能靠打印看。接入 LangSmith 后，每次对话的完整调用链（agent 节点 ↔ tools 节点 → 每次 LLM 调用）都会自动上传到平台可视化。
+
+```env
+# backend/.env
+LANGSMITH_API_KEY=ls__你的key      # https://smith.langchain.com → Settings → API Keys
+LANGSMITH_PROJECT=lab-agent
+```
+
+填上并重启后端即可生效，**代码零改动**。不填则追踪保持关闭，完全不影响功能。
+
+实现要点：
+- 通过环境变量启用（`setup_langsmith_tracing()`），LangChain / LangGraph 的所有子对象自动继承，无需逐节点传 callback
+- 每次调用携带 `metadata`（`user_id` / `username`）与 `run_name`，可在平台上按用户、按场景检索链路
+- 单元测试锁定"未配key 时不得污染环境变量"这一行为
+
 ## 🗺 Roadmap
 
 - [x] Agent 评测集（14 条用例 + 四维评分 + 分类得分）
-- [x] 核心业务与工具单元测试（36 个用例）+ CI
-- [ ] 接入 LangSmith 做工具调用链路追踪
+- [x] 核心业务与工具单元测试（41 个用例）+ CI
+- [x] 接入 LangSmith 做工具调用链路追踪
 - [ ] 对话记录后端持久化（跨设备同步）
 
 ## 📄 License

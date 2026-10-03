@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from app.config import UPLOAD_DIR
+from app.config import UPLOAD_DIR, settings, setup_langsmith_tracing
 from app.models.user import User  # noqa: F401  确保模型已注册到 Base.metadata
 from app.models.lab import Lab  # noqa: F401  确保模型已注册到 Base.metadata
 from app.models.equipment import Equipment  # noqa: F401  确保模型已注册到 Base.metadata
@@ -16,10 +16,18 @@ from app.common.exceptions import (
     business_exception_handler,
     validation_exception_handler,
     http_exception_handler,
-    global_exception_handler  
+    global_exception_handler
 )
 from app.services import reservation_service, kb_service
 from app.common import logger
+
+# LangSmith 链路追踪：必须在创建 LLM 实例之前设置环境变量，
+# LangChain 的所有子对象（ChatOpenAI / ToolNode / LangGraph 图）会自动继承
+if setup_langsmith_tracing():
+    logger.info(f"LangSmith 追踪已开启，项目: {settings.LANGSMITH_PROJECT}")
+else:
+    logger.info("未配置 LANGSMITH_API_KEY，链路追踪保持关闭")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
