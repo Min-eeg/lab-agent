@@ -234,12 +234,10 @@ python -m pytest tests -v        # 36 个用例，秒级完成，不调大模型
 - `test_reservation_service.py`：日期/时间规范化（含 `9:00` vs `11:00` 字符串比较坑）、过去日期、结束早于开始、实验室关闭/不存在、开放时间边界、时段冲突、`status=0` 不能用真值判断
 - `test_agent_tools.py`：工具返回值的 JSON 契约、失败必须 `ok:false` + `error`（防谎报成功）、dry-run 绝不落库、系统提示词必须注入真实日期且防幻觉护栏未被删除
 
-GitHub Actions（`.github/workflows/ci.yml`）：push / PR 自动跑后端测试 + 前端构建校验（构建失败等价于存在缺失导入，等于免费的静态检查）。
-
 ## 🗺 Roadmap
 
 - [x] Agent 评测集（14 条用例 + 四维评分 + 分类得分）
-- [x] 核心业务与工具单元测试（36 个用例）+ GitHub Actions CI
+- [x] 核心业务与工具单元测试（36 个用例）+ CI
 - [ ] 接入 LangSmith 做工具调用链路追踪
 - [ ] 对话记录后端持久化（跨设备同步）
 
