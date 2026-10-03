@@ -48,21 +48,21 @@
 
 预约主流程（学生提交 → 管理员审核）：
 
-![预约主流程](docs/images/architecture.png)
+![预约主流程](docs/images/reservation-flow.png)
 
 预约状态机（`0 待审核 / 1 已通过 / 2 已拒绝 / 3 已取消`，待审核状态超时未审核会被定时任务自动取消）：
 
-![预约状态机](docs/images/architecture.png)
+![预约状态机](docs/images/reservation-state.png)
 
 ## 🤖 AI 助手
 
 AI 能力分五层叠加——从纯对话，到 RAG、Tool Calling、LangGraph Agent，再到 SSE 流式：
 
-![AI 能力叠加](docs/images/architecture.png)
+![AI 能力叠加](docs/images/ai-layers.png)
 
 **LangGraph Agent 循环**：有 `tool_calls` 就执行工具并回填结果继续决策，没有则返回文本；`recursion_limit` 防空转：
 
-![LangGraph Agent](docs/images/architecture.png)
+![LangGraph Agent](docs/images/langgraph-agent.png)
 
 **一次典型的对话式预约（端到端）**：
 
@@ -80,11 +80,11 @@ AI 能力分五层叠加——从纯对话，到 RAG、Tool Calling、LangGraph 
 
 **Tool Calling 完整时序**：
 
-![Tool Calling](docs/images/architecture.png)
+![Tool Calling](docs/images/tool-calling.png)
 
 ## 📚 RAG 知识库
 
-![RAG 流程](docs/images/architecture.png)
+![RAG 流程](docs/images/rag-flow.png)
 
 - 知识库为 7 篇主题聚焦的 Markdown（`backend/data/kb/`）：预约规则、预约状态说明、开放时间、安全规范、设备使用、实验室介绍、常见问题
 - **按文件粒度入库**：一篇文档 = 一条向量，主题聚焦保证检索精度
@@ -93,7 +93,7 @@ AI 能力分五层叠加——从纯对话，到 RAG、Tool Calling、LangGraph 
 
 ## ⚡ 流式输出
 
-![SSE 流式](docs/images/architecture.png)
+![SSE 流式](docs/images/sse-flow.png)
 
 - 后端：`agent.stream(stream_mode=["messages", "updates"])` —— `messages` 通道取 token 增量，`updates` 通道识别工具节点的开始 / 结束
 - 事件协议统一：`status / tool_start / tool_end / token / done / error`
@@ -101,7 +101,7 @@ AI 能力分五层叠加——从纯对话，到 RAG、Tool Calling、LangGraph 
 
 ## 🧱 技术栈
 
-![技术栈](docs/images/architecture.png)
+![技术栈](docs/images/tech-stack.png)
 
 | 层 | 技术 |
 | --- | --- |
