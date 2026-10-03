@@ -11,21 +11,8 @@ jobs:
     name: 后端单元测试
     runs-on: ubuntu-latest
 
-    services:
-      # 单元测试用 FakeDB 替身，不连真实库；
-      # 这里起MySQL 是为了让导入链和集成冒烟测试也能跑
-      mysql:
-        image: mysql:5.7
-        env:
-          MYSQL_ROOT_PASSWORD: test123456
-          MYSQL_DATABASE: lab_agent
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+    # 不起 MySQL: 单元测试全部用 FakeDB 替身，不连真实库。
+    # 好处是 CI 不依赖任何外部服务，2 分钟内跑完，也不会有偶发连接失败。
 
     defaults:
       run:
@@ -43,6 +30,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest httpx
+
+      # .env 被 gitignore 排除（密钥不能进仓库），CI 上不存在这个文件。
+      # 单元测试用FakeDB 替身、不连库也不调大模型，这里给占位值让配置能加载。
+      - name: 注入占位环境变量（无 .env 环境下让配置可加载）
+        env:
+          DATABASE_URL: mysql+pymysql://root:password@localhost:3306/lab_agent?charset=utf8mb4
+          JWT_SECRET_KEY: ci-only-insecure-secret
+          LLM_API_KEY: ci-placeholder
+          LLM_BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+          LLM_MODEL: qwen-plus
+        run: echo "env 已注入"
 
       - name: 单元测试（不依赖数据库与大模型）
         run: python -m pytest tests -v
