@@ -226,7 +226,7 @@ cd backend
 
 ```bash
 cd backend
-python -m pytest tests -v        # 41 个用例，秒级完成，不调大模型
+python -m pytest tests -v        # 47 个用例，秒级完成，不调大模型
 ```
 
 覆盖两块，都是**不依赖大模型**的确定性测试：
@@ -254,7 +254,7 @@ LANGSMITH_PROJECT=lab-agent
 ## 🗺 Roadmap
 
 - [x] Agent 评测集（14 条用例 + 四维评分 + 分类得分）
-- [x] 核心业务与工具单元测试（41 个用例）+ CI
+- [x] 核心业务与工具单元测试（47 个用例）+ CI
 - [x] 接入 LangSmith 做工具调用链路追踪
 - [ ] 对话记录后端持久化（跨设备同步）
 

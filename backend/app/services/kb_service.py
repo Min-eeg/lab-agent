@@ -32,13 +32,17 @@ _embedding_fn = None
 
 
 def get_embedding_fn():
-    """懒加载 embedding 模型：只加载一次，之后复用同一个实例"""
+    """懒加载 embedding 模型：只加载一次，之后进程内复用同一个实例。
+
+    关键: 必须用 _model_name(本地路径优先)，不要硬编码 "BAAI/bge-small-zh-v1.5"。
+    硬编码会让 sentence-transformers 每次都去 HuggingFace 做版本检查/下载，
+    国内网络下这一来就是 30~40 秒(实测 40.8s)，而本地模型加载只需 1~2 秒。
+    """
     global _embedding_fn
     if _embedding_fn is not None:
         return _embedding_fn
-    # SentenceTransformerEmbeddingFunction 自带类级缓存，同名模型也不会重复加载
     _embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="BAAI/bge-small-zh-v1.5"
+        model_name=_model_name  # 复用顶部算好的：本地目录存在则用本地，否则回落线上名
     )
     return _embedding_fn
 

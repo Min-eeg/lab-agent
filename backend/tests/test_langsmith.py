@@ -12,9 +12,11 @@ import pytest
 
 class TestTracingToggle:
     def test_disabled_without_key(self, monkeypatch):
-        from app.config import Settings, setup_langsmith_tracing
+        from app.config import setup_langsmith_tracing, settings
 
-        monkeypatch.setenv("LANGSMITH_API_KEY", "")
+        # 直接改 settings 对象而不是环境变量:
+        # settings 在模块导入时就从 .env 读完了，改环境变量对它无效
+        monkeypatch.setattr(settings, "LANGSMITH_API_KEY", "")
         monkeypatch.delenv("LANGSMITH_TRACING", raising=False)
         monkeypatch.delenv("LANGCHAIN_TRACING_V2", raising=False)
 
