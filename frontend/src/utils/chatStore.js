@@ -69,15 +69,27 @@ function loadDraft() {
   }
 }
 
-// 后端是历史记录的主数据源: 拉到就覆盖本地, 拉不到就保留 localStorage 兜底内容
-async function loadHistoryFromServer() {
+// 同步版本号: initChat / sendMessage 都会自增。异步拉历史返回时版本已变,
+// 说明等待期间用户有了新动作(换账号/已发新消息), 直接丢弃这次结果, 防止覆盖新状态
+let syncVersion = 0
+
+// 后端是历史记录的主数据源: 拉到就以后端为准(包括"后端为空"——可能在别的设备清空了),
+// 只有请求失败才保留 localStorage 兜底内容
+async function loadHistoryFromServer(version) {
   try {
     const res = await getChatHistoryApi()
-    const list = res?.data?.messages || []
+    if (version !== syncVersion) return
+    const list = (res?.data?.messages || [])
+      .filter((item) => String(item.content || '').trim())
+      .map(({ role, content }) => ({ role, content }))
     if (list.length) {
       messages.value = list
-        .filter((item) => String(item.content || '').trim())
-        .map(({ role, content }) => ({ role, content }))
+    } else {
+      // 后端没有记录: 本地缓存是别的设备清空前的残留, 一并作废
+      messages.value = [{ ...WELCOME }]
+      try {
+        localStorage.removeItem(storageKey())
+      } catch {}
     }
   } catch {
     // 后端不可用: 不打扰用户, 继续用本地缓存
@@ -100,13 +112,14 @@ function initChat(username) {
   }
   if (!messages.value.length) messages.value = [{ ...WELCOME }]
   loadDraft()
-  loadHistoryFromServer() // 异步覆盖: 本地缓存先上屏, 后端记录到了再替换
+  loadHistoryFromServer(++syncVersion) // 异步覆盖: 本地缓存先上屏, 后端记录到了再以它为准
 }
 
 // 发送一条消息并消费 SSE 流。onEvent 供组件做提示等视图反应, 不参与状态管理
 async function sendMessage(text, { onEvent } = {}) {
   const content = String(text || '').trim()
   if (!content || loading.value) return
+  syncVersion++ // 用户已经开始新对话, 作废任何还没返回的历史拉取, 免得新消息被旧历史盖掉
 
   messages.value.push({ role: 'user', content })
   // 必须用 reactive: 普通对象 push 后再改字段, 视图可能不更新
