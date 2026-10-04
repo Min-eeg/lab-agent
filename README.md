@@ -6,8 +6,11 @@
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.2-1C3C3C?logo=langchain&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-5.7-4479A1?logo=mysql&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
+![CI](https://github.com/Min-eeg/lab-agent/actions/workflows/ci.yml/badge.svg)
 
 一个前后端分离的实验室预约系统：常规的**实验室 / 设备 / 预约 / 审核业务**之上，接入了一个真正能"动手干活"的 **AI 助手**——它不只是问答，而是通过 Tool Calling 直接查库、和用户确认后把预约写进数据库，全过程 SSE 流式可见。
+
+> **数据亮点**：Agent 评测集 14/14 通过（提示词迭代三轮 64.3% → 100%）· RAG 检索延迟 11.37s → 0.01s（LangSmith 链路定位后修复）· 47 个单元测试 + CI 全绿
 
 ---
 
@@ -32,13 +35,15 @@
 
 ## 📷 界面预览
 
-<!-- 建议截几张图放到 docs/screenshots/ 后取消注释：
+AI 对话完成一次真实预约的完整过程（工具调用流式展开 → 对话确认 → 落库返回预约单号）：
+
+![AI 预约演示](docs/screenshots/ai-demo.gif)
+
 | 首页 | AI 助手 |
 | --- | --- |
 | ![](docs/screenshots/home.png) | ![](docs/screenshots/ai-chat.png) |
 | 实验室管理 | 预约审核 |
 | ![](docs/screenshots/lab-admin.png) | ![](docs/screenshots/audit.png) |
--->
 
 ## 🏗 系统架构
 
@@ -195,7 +200,9 @@ lab-agent
 │       ├── layouts/        # 布局与侧边菜单（高亮跟随路由）
 │       ├── router/
 │       └── utils/          # request 拦截器 / chatStore（组件外对话状态）/ file
-└── docs/images/            # README 示意图（scripts/gen_diagrams_png.py 生成）
+└── docs
+    ├── images/            # README 架构示意图（scripts/gen_diagrams_png.py 生成）
+    └── screenshots/       # 界面截图与演示 GIF
 ```
 
 ## 💡 工程细节与踩坑记录
