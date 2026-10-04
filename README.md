@@ -35,10 +35,6 @@
 
 ## 📷 界面预览
 
-AI 对话完成一次真实预约的完整过程（工具调用流式展开 → 对话确认 → 落库返回预约单号）：
-
-![AI 预约演示](docs/screenshots/ai-demo.gif)
-
 | 首页 | AI 助手 |
 | --- | --- |
 | ![](docs/screenshots/home.png) | ![](docs/screenshots/ai-chat.png) |
