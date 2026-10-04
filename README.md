@@ -10,7 +10,7 @@
 
 一个前后端分离的实验室预约系统：常规的**实验室 / 设备 / 预约 / 审核业务**之上，接入了一个真正能"动手干活"的 **AI 助手**——它不只是问答，而是通过 Tool Calling 直接查库、和用户确认后把预约写进数据库，全过程 SSE 流式可见。
 
-> **数据亮点**：Agent 评测集 14/14 通过（提示词迭代三轮 64.3% → 100%）· RAG 检索延迟 11.37s → 0.01s（LangSmith 链路定位后修复）· 47 个单元测试 + CI 全绿
+> **数据亮点**：Agent 评测集 14/14 通过（提示词迭代三轮 64.3% → 100%）· RAG 检索延迟 11.37s → 0.01s（LangSmith 链路定位后修复）· 60 个单元测试 + CI 全绿
 
 ---
 
@@ -31,7 +31,7 @@
 - 🛠 **Tool Calling 落库**：5 个业务工具，LLM 决策直连 MySQL，对话确认后真实生成预约单
 - ⚡ **流式全链路**：LangGraph 双 stream_mode → SSE 事件流 → 前端打字机 + 工具过程可视化（"正在查询开放实验室…"）
 - 🛡 **防幻觉防护**：时间参数归一化校验、工具失败强制如实回述，杜绝"假成功"
-- 💾 **对话持久化**：切页面不断流，刷新后对话仍在（模块级 store + localStorage 按用户隔离）
+- 💾 **对话持久化**：问答在流式结束时落 MySQL（`chat_sessions` / `chat_messages`），换设备登录可恢复历史；前端模块级 store + localStorage 兜底，切页面不断流
 
 ## 📷 界面预览
 
@@ -176,9 +176,9 @@ npm run dev
 lab-agent
 ├── backend
 │   ├── app
-│   │   ├── api/            # 路由层：auth / user / lab / equipment / reservation / files / ai
-│   │   ├── services/       # 业务层：含 agent_tools（5 个工具）、agent_service（LangGraph 图）、kb_service（RAG）
-│   │   ├── models/         # SQLAlchemy 模型
+│   │   ├── api/            # 路由层：auth / user / lab / equipment / reservation / files / ai / chat
+│   │   ├── services/       # 业务层：含 agent_tools（5 个工具）、agent_service（LangGraph 图）、kb_service（RAG）、chat_service（对话持久化）
+│   │   ├── models/         # SQLAlchemy 模型（users / labs / equipments / reservations / chat_sessions / chat_messages）
 │   │   ├── schemas/        # Pydantic 请求/响应模型
 │   │   ├── dependencies/   # 鉴权等通用依赖
 │   │   ├── common/         # logger / 统一异常
@@ -191,7 +191,7 @@ lab-agent
 │   └── requirements.txt
 ├── frontend
 │   └── src
-│       ├── api/            # 接口封装（含 SSE 流式解析）
+│       ├── api/            # 接口封装（含 SSE 流式解析、对话记录读写）
 │       ├── views/          # 页面（AIChat / Home / Lab / LabEquipment / Profile …）
 │       ├── layouts/        # 布局与侧边菜单（高亮跟随路由）
 │       ├── router/
@@ -210,6 +210,7 @@ lab-agent
 3. **模型本地化**：国内网络访问 huggingface 证书校验失败、hf-mirror 也被限流。修复：下载脚本改走 ModelScope，模型落盘 `data/models/`，启动优先离线加载（`HF_HUB_OFFLINE=1`），换机器一键重下。
 4. **流式 API 迁移**：`langchain-core 1.x` 移除了 `stream_events(version="v2")`，迁移到 LangGraph 原生 `stream_mode=["messages","updates"]` 双通道方案；同时踩过 `llm.stream()` 返回生成器被塞进图状态的坑（节点内应使用 `invoke`）。
 5. **流式状态与组件生命周期**：对话状态住在组件实例里，切页面即销毁、回复只剩半截。修复：重构为模块级 store 承接流式任务，组件只是视图——切走后流继续跑，切回来还能看到打字机继续输出。
+6. **流式与落库的时序**：对话记录不能边流边存——半截回答是残缺的，error 轮次入库还会污染后续上下文。做法：SSE 生成器里逐 token 攒全文，`done` 事件时才整段写入（问答两边都非空才落库）；落库失败只记日志，不影响已经发给用户的回答。
 
 ## 🧪 质量保障
 
@@ -237,13 +238,14 @@ cd backend
 
 ```bash
 cd backend
-python -m pytest tests -v        # 47 个用例，秒级完成，不调大模型
+python -m pytest tests -v        # 60 个用例，秒级完成，不调大模型
 ```
 
-覆盖两块，都是**不依赖大模型**的确定性测试：
+覆盖三块，都是**不依赖大模型**的确定性测试：
 
 - `test_reservation_service.py`：日期/时间规范化（含 `9:00` vs `11:00` 字符串比较坑）、过去日期、结束早于开始、实验室关闭/不存在、开放时间边界、时段冲突、`status=0` 不能用真值判断
 - `test_agent_tools.py`：工具返回值的 JSON 契约、失败必须 `ok:false` + `error`（防谎报成功）、dry-run 绝不落库、系统提示词必须注入真实日期且防幻觉护栏未被删除
+- `test_chat_service.py`：对话落库时机（流式 done 才写、空回答不入库）、活跃会话复用、用户间隔离、清空级联删除
 
 ## 🔍 可观测性：LangSmith 链路追踪
 
@@ -259,9 +261,9 @@ agent 的执行过程是黑盒——工具调了几次、每次参数是什么�
 ## 🗺 Roadmap
 
 - [x] Agent 评测集（14 条用例 + 四维评分 + 分类得分）
-- [x] 核心业务与工具单元测试（47 个用例）+ CI
+- [x] 核心业务与工具单元测试（60 个用例）+ CI
 - [x] 接入 LangSmith 做工具调用链路追踪
-- [ ] 对话记录后端持久化（跨设备同步）
+- [x] 对话记录后端持久化（跨设备同步）
 
 ## 📄 License
 

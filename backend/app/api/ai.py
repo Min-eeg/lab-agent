@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from app.common import logger
 from app.common.response import Response
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.schemas.ai import ChatMessage, ChatRequest
-from app.services import agent_service, ai_service
+from app.services import agent_service, ai_service, chat_service
 import json
 from fastapi.responses import StreamingResponse
 
@@ -19,6 +20,10 @@ def chat(
     db: Session = Depends(get_db),
 ):
     content = agent_service.run_agent(db, current_user, data)
+    # 非流式同样落库，保持两种接口的历史记录行为一致
+    chat_service.append_round(
+        db, current_user.id, chat_service.extract_user_question(data.messages), content
+    )
     return Response.success(data=ChatMessage(role="assistant", content=content))
 
 
@@ -36,7 +41,22 @@ def chat_stream(
 ):
     def event_gen():
         # 内层生成器：取出业务事件，包装成 SSE 文本再往外 yield
+        collected = []  # 逐 token 攒回答全文，done 时整段落库
         for event in agent_service.stream_agent(db, current_user, data):
+            if event.get("type") == "token":
+                collected.append(event.get("content") or "")
+            elif event.get("type") == "done":
+                # 落库时机必须等流跑完：半截回答是残缺的不能存，error 的轮次也不存
+                try:
+                    chat_service.append_round(
+                        db,
+                        current_user.id,
+                        chat_service.extract_user_question(data.messages),
+                        "".join(collected),
+                    )
+                except Exception:
+                    # 落库失败不影响已经发给用户的回答
+                    logger.exception("对话记录落库失败")
             yield _sse_line(event)
 
     return StreamingResponse(

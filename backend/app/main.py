@@ -8,6 +8,7 @@ from app.models.user import User  # noqa: F401  确保模型已注册到 Base.me
 from app.models.lab import Lab  # noqa: F401  确保模型已注册到 Base.metadata
 from app.models.equipment import Equipment  # noqa: F401  确保模型已注册到 Base.metadata
 from app.models.reservation import Reservation  # noqa: F401  确保模型已注册到 Base.metadata
+from app.models.chat import ChatSession, ChatMessage  # noqa: F401  确保模型已注册到 Base.metadata
 from app.database import Base, engine
 from app.api import api, reservation
 from starlette.middleware.cors import CORSMiddleware

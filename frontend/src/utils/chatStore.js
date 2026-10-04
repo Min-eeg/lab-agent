@@ -1,12 +1,14 @@
 import { ref, reactive, watch } from 'vue'
 import { chatStreamApi } from '@/api/ai'
+import { getChatHistoryApi, clearChatHistoryApi } from '@/api/chat'
 
 /**
  * 对话模块级 store（单例）。
  *
  * 为什么不放组件里: 路由切换会销毁组件, 内存消息和进行中的流式请求都会跟着丢。
  * 状态放在模块作用域: 组件只是视图, 切走后流继续跑、字继续拼, 切回来接着看。
- * localStorage 做兜底持久化(刷新/换账号也能恢复), 按用户名隔离。
+ * 持久化两层: 后端 MySQL 为主(换设备登录也能看到历史), localStorage 为兜底(后端不可用时还能恢复)。
+ * 后端写入由流式接口在 done 时自动完成, 前端只负责「读取」和「清空」。
  */
 
 const WELCOME = {
@@ -67,6 +69,21 @@ function loadDraft() {
   }
 }
 
+// 后端是历史记录的主数据源: 拉到就覆盖本地, 拉不到就保留 localStorage 兜底内容
+async function loadHistoryFromServer() {
+  try {
+    const res = await getChatHistoryApi()
+    const list = res?.data?.messages || []
+    if (list.length) {
+      messages.value = list
+        .filter((item) => String(item.content || '').trim())
+        .map(({ role, content }) => ({ role, content }))
+    }
+  } catch {
+    // 后端不可用: 不打扰用户, 继续用本地缓存
+  }
+}
+
 // 进入页面时调用: 同一用户直接复用内存状态(切页面回来流式还在继续), 换用户才读缓存
 function initChat(username) {
   if (currentUsername === username && messages.value.length) return
@@ -83,6 +100,7 @@ function initChat(username) {
   }
   if (!messages.value.length) messages.value = [{ ...WELCOME }]
   loadDraft()
+  loadHistoryFromServer() // 异步覆盖: 本地缓存先上屏, 后端记录到了再替换
 }
 
 // 发送一条消息并消费 SSE 流。onEvent 供组件做提示等视图反应, 不参与状态管理
@@ -147,6 +165,8 @@ function clearChat() {
   try {
     localStorage.removeItem(storageKey())
   } catch {}
+  // 后端记录同步清掉: 否则换设备登录旧对话又冒出来
+  clearChatHistoryApi().catch(() => {})
 }
 
 export function useChatStore() {
